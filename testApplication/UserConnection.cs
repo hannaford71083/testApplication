@@ -12,14 +12,15 @@ namespace testApplication
     {
 
 
-        #region private variables
-
-        public HubConnection Connection;
-        public IHubProxy MyHub;
-        public string GroupId;
-
+        #region public variables
+            public HubConnection Connection;
+            public IHubProxy MyHub;
+            public string GroupId;
         #endregion
 
+        #region private variables
+            private System.Timers.Timer _timer;
+        #endregion
 
 
         /*
@@ -43,15 +44,36 @@ namespace testApplication
         }
 
 
-        private void simulateUploadData()
+        public void InitTimer() {
+            Console.WriteLine("- Timer started -");
+            _timer = new System.Timers.Timer();
+            _timer.Interval = 1000;
+            // Create a timer with a X milli second interval.
+            _timer = new System.Timers.Timer(3000);
+            _timer.Elapsed += (sender, e) => uploadData(sender, e, this);// Hook up the Elapsed event for the timer.
+            _timer.AutoReset = true;// Have the timer fire repeated events (true is the default)
+            _timer.Enabled = true;// Start the timer
+            _timer.Start();
+        }
+
+        private static void uploadData(object sender, EventArgs e, UserConnection user)
         {
-            
-
-
-
+            try
+            {
+                Console.WriteLine("uploadData for User ID : {0} Group ID : {1}",  user.Connection.ConnectionId ,user.GroupId);
+                user.MyHub.Invoke<object[]>("UploadData", user.GroupId, user.Connection.ConnectionId, 10);
+                //userConnectionList.FirstOrDefault().MyHub.Invoke<object[]>("UploadData", "groupId", "playerId", "presses");
+            }
+            catch (Exception ex) {
+                Console.WriteLine("uploadData error : " + ex.Message);
+            }
         }
 
 
+        public void EndConnection() {
+            this.Connection.Stop();
+            //this._timer.Dispose();
+        }
 
 
 
