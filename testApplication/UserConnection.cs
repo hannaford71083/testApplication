@@ -60,8 +60,10 @@ namespace testApplication
         {
             try
             {
-                Console.WriteLine("uploadData for User ID : {0} Group ID : {1}",  user.Connection.ConnectionId ,user.GroupId);
-                user.MyHub.Invoke<object[]>("UploadData", user.GroupId, user.Connection.ConnectionId, 10);
+                //Console.WriteLine("uploadData for User ID : {0} Group ID : {1}",  user.Connection.ConnectionId ,user.GroupId);
+                //user.MyHub.Invoke<object[]>("UploadData", user.GroupId, user.Connection.ConnectionId, 10);
+
+                user.MyHub.Invoke<object[]>("uploadData", new PlayerState{ Id =  user.Connection.ConnectionId, GroupId = user.GroupId, Clicks = 10  } );
                 //userConnectionList.FirstOrDefault().MyHub.Invoke<object[]>("UploadData", "groupId", "playerId", "presses");
             }
             catch (Exception ex) {

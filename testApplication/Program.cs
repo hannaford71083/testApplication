@@ -20,7 +20,7 @@ namespace testApplication
 
             Console.WriteLine("Press Enter to Connect.");
             Console.ReadLine();
-            int quantity = 10;
+            int quantity = 4;
             for (int i = 0; i <= quantity; i++ )
             {
                 var connection = new HubConnection("http://localhost:53398"); //Set connection
@@ -33,10 +33,17 @@ namespace testApplication
                 myHub.Invoke<string>("ConnectTestUser", nameInput).Wait();
                 myHub.On < string,string >("UploadListInfo", (userId, groupId) =>
                 {
-                    Console.WriteLine("User ID {0} , Group ID {1}  ", userId, groupId );
+                    //Console.WriteLine("User ID {0} , Group ID {1}  ", userId, groupId );
                     userConnectionList.FirstOrDefault(o => o.Connection.ConnectionId == userId  ).GroupId = groupId;
                 });
-                
+
+
+                myHub.On<PlayerState>("updateGame", (PlayerState ps) =>
+                {
+                    Console.WriteLine("Clicks {0} for User : {1} ", ps.Clicks, ps.Id );
+                });
+
+
                 Console.WriteLine("--> {0}", i);
                 UserConnection user = new UserConnection(i);
                 user.Connection = connection;
@@ -64,8 +71,10 @@ namespace testApplication
             Console.WriteLine("Run inter-group communication simulation.");
             Console.ReadLine();
             int j = 0;
+            int connectionsSimulatingLimit = userConnectionList.Count(); //currently testing all connections
             foreach (UserConnection userCon in userConnectionList) {
-                if (j > 2) {    //hardcoded to run for 2 user Connnections
+                if (j > connectionsSimulatingLimit)
+                {    
                     break;
                 }
                 userCon.InitTimer();
@@ -82,7 +91,6 @@ namespace testApplication
                 userI.EndConnection();
                 Console.WriteLine("userI._connection.State : " + userI.Connection.State.ToString() );
             }
-
 
             //need to clear all the timer events 
             //Console.WriteLine("--------------- userConnectionList ---------------");
