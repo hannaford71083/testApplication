@@ -47,9 +47,14 @@ namespace testApplication
         public void InitTimer() {
             Console.WriteLine("- Timer started -");
             _timer = new System.Timers.Timer();
-            _timer.Interval = 1000;
+            //=- 10% 
+            Random random = new Random();
+
+            int randomrange = random.Next(0, 200);
+            int randomInterval = 900 + randomrange;
+            _timer.Interval = randomInterval;
             // Create a timer with a X milli second interval.
-            _timer = new System.Timers.Timer(3000);
+            //_timer = new System.Timers.Timer(3000);
             _timer.Elapsed += (sender, e) => uploadData(sender, e, this);// Hook up the Elapsed event for the timer.
             _timer.AutoReset = true;// Have the timer fire repeated events (true is the default)
             _timer.Enabled = true;// Start the timer
@@ -62,8 +67,7 @@ namespace testApplication
             {
                 //Console.WriteLine("uploadData for User ID : {0} Group ID : {1}",  user.Connection.ConnectionId ,user.GroupId);
                 //user.MyHub.Invoke<object[]>("UploadData", user.GroupId, user.Connection.ConnectionId, 10);
-
-                user.MyHub.Invoke<object[]>("uploadData", new PlayerState{ Id =  user.Connection.ConnectionId, GroupId = user.GroupId, Clicks = 10  } );
+                user.MyHub.Invoke<object[]>("UploadData", new PlayerState{ Id =  user.Connection.ConnectionId, GroupId = user.GroupId, Clicks = 10  } );
                 //userConnectionList.FirstOrDefault().MyHub.Invoke<object[]>("UploadData", "groupId", "playerId", "presses");
             }
             catch (Exception ex) {
@@ -74,7 +78,7 @@ namespace testApplication
 
         public void EndConnection() {
             this.Connection.Stop();
-            //this._timer.Dispose();
+            this._timer.Stop();
         }
 
 

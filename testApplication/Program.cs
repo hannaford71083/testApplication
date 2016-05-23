@@ -5,22 +5,27 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNet.SignalR.Client;
-
+using NLog;
+using System.Diagnostics;
 
 namespace testApplication
 {
     class Program
     {
 
+      private static Logger logger = LogManager.GetCurrentClassLogger();
 
         static List<UserConnection> userConnectionList = new List<UserConnection>();
 
         static void Main(string[] args)
         {
 
+            Program.logger.Debug("Start Program");
+            Debug.WriteLine("Start Program");
+
             Console.WriteLine("Press Enter to Connect.");
             Console.ReadLine();
-            int quantity = 4;
+            int quantity = 12;
             for (int i = 0; i <= quantity; i++ )
             {
                 var connection = new HubConnection("http://localhost:53398"); //Set connection
@@ -35,13 +40,21 @@ namespace testApplication
                 {
                     //Console.WriteLine("User ID {0} , Group ID {1}  ", userId, groupId );
                     userConnectionList.FirstOrDefault(o => o.Connection.ConnectionId == userId  ).GroupId = groupId;
+                    Program.logger.Debug("List info updated for {0}", userId);
                 });
 
 
-                myHub.On<PlayerState>("updateGame", (PlayerState ps) =>
+                myHub.On<GameGroup>("UpdateGame", (GameGroup gg) =>
                 {
-                    Console.WriteLine("Clicks {0} for User : {1} ", ps.Clicks, ps.Id );
+                  //Console.WriteLine("Here is some data:  {0}", astring);
+                    //Program.logger.Debug(string.Format("GameGroup id is :  {0}", gg.id ));
+                    foreach (PlayerState ps in gg.PlayerStates.Values)
+                    {
+                        //Program.logger.Debug(string.Format("Player id is :  {0}", ps.Id));
+                    }
+
                 });
+
 
 
                 Console.WriteLine("--> {0}", i);
@@ -55,6 +68,7 @@ namespace testApplication
             Console.WriteLine("Press Enter to Allocate Groups.");
             Console.ReadLine();
             //need to simulate uploiad every x secs
+
             userConnectionList.FirstOrDefault().MyHub.Invoke("AssignTestUsersToGroup").ContinueWith(task =>
             {
                 if (task.IsFaulted)
@@ -68,6 +82,29 @@ namespace testApplication
                     //Console.WriteLine(task.Result);
                 }
             }).Wait();
+
+
+
+            Console.WriteLine("Show Allocated groups");
+            Console.ReadLine();
+
+
+            List<UserConnection> sortedUserconnections = (from UserConnection userCon in userConnectionList orderby userCon.GroupId select userCon).ToList<UserConnection>();
+
+            //userConnectionList = userConnectionList.OrderBy(element  )
+
+            string currentGroup = "";
+            foreach (UserConnection connectedUser in userConnectionList) { 
+                if(connectedUser.GroupId != currentGroup ){
+                    currentGroup  = connectedUser.GroupId ;
+                    Console.WriteLine("------------ Group {0} ----------", currentGroup);
+                }
+                Console.WriteLine("     User : {0}", connectedUser.Connection.ConnectionId.ToString());
+            }
+
+
+
+
             Console.WriteLine("Run inter-group communication simulation.");
             Console.ReadLine();
             int j = 0;
@@ -99,7 +136,15 @@ namespace testApplication
 
 
 
+        }
 
+        public static void UpdatePlayers(string gg) {
+
+          //  (gameGroup) =>
+          //{
+          Console.WriteLine("GameGroup id TEST ----> {0} ", gg);
+          //var a = "adsasdadsad";
+          //});
 
         }
 
