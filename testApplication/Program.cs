@@ -13,26 +13,46 @@ namespace testApplication
     class Program
     {
 
-      private static Logger logger = LogManager.GetCurrentClassLogger();
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+        static HubBlockingCollection<UserConnection> userConnectionList = new HubBlockingCollection<UserConnection>();
+        public static HubBlockingCollection<UserConnection> userConnectionMonitoringList = new HubBlockingCollection<UserConnection>();
+        public static TestSettings settings; // acts like singleton
 
-        static List<UserConnection> userConnectionList = new List<UserConnection>();
 
         static void Main(string[] args)
         {
 
+
+            Program.settings = new TestSettings(
+                connectionsQuantityIn : 300,
+                timerRepeatMsIn:        200,
+                randomPercentageIn :    10,
+                quickTestModeIn :       true,
+                checkClicksTestIn :     false,
+                checkClicksTest_instancesToMonitorIn : 10,
+                checkClicksTest_valueChangeIntervalMsIn : 500,
+                checkClicksTest_valueChangeTimeVariabilityPctIn: 50,
+                checkClicksTest_rangeUpperIn: 100,
+                checkClicksTest_rangeLowerIn: 0
+                );
+
+
             Program.logger.Debug("Start Program");
             Debug.WriteLine("Start Program");
 
-            Console.WriteLine("Press Enter to Connect.");
-            Console.ReadLine();
-            int quantity = 12;
-            for (int i = 0; i <= quantity; i++ )
+            if (!Program.settings.quickTestMode) { 
+                Console.WriteLine("Press Enter to Connect.");
+                Console.ReadLine();
+            }
+
+            int quantity = Program.settings.connectionsQuantity;
+            for (int i = 1; i <= quantity; i++ )
             {
                 var connection = new HubConnection("http://localhost:53398"); //Set connection
                 var myHub = connection.CreateHubProxy("chatHub");   //Make proxy to hub based on hub name on server
                 connection.Start().Wait(); //Start connection
-
                 string nameInput = "Dave " + i.ToString();
+                UserConnection user = new UserConnection(i);
 
                 //TODO: Consolidate these 2 into the UserConnections Class as methods
                 myHub.Invoke<string>("ConnectTestUser", nameInput).Wait();
@@ -43,56 +63,71 @@ namespace testApplication
                     Program.logger.Debug("List info updated for {0}", userId);
                 });
 
-
                 myHub.On<GameGroup>("UpdateGame", (GameGroup gg) =>
                 {
-                  //Console.WriteLine("Here is some data:  {0}", astring);
-                    //Program.logger.Debug(string.Format("GameGroup id is :  {0}", gg.id ));
-                    foreach (PlayerState ps in gg.PlayerStates.Values)
+                    bool belongsToThisGroup = false;
+                    foreach (UserConnection userCon in Program.userConnectionMonitoringList) 
                     {
-                        //Program.logger.Debug(string.Format("Player id is :  {0}", ps.Id));
+                        belongsToThisGroup = user.GroupId == userCon.GroupId ? true : belongsToThisGroup; 
                     }
 
+                    if (belongsToThisGroup) { // user is in the group being iterated through
+                        foreach (PlayerState ps in gg.PlayerStates.Values)
+                        {
+                            if (user.Connection.ConnectionId == ps.Id && 
+                                user.ClickChangeState == UserConnection.ClickChangeStatus.Uploaded )
+                            {
+                                //Found player in group,  now check  
+                                //a) time taken for round trip & b) whether the same value submitted has been returned
+                                //Program.logger.Debug("Round trip time (ms) : {0} , user id : {1}", user.getRoundTripTimeMs().ToString(), user.Connection.ConnectionId );
+                                user.roundtripTimesMsList.Add(user.getRoundTripTimeMs());
+                                user.ClickChangeState = UserConnection.ClickChangeStatus.Received; 
+
+                            }
+                        }
+                    }
+
+                    
                 });
 
-
-
                 Console.WriteLine("--> {0}", i);
-                UserConnection user = new UserConnection(i);
+                
                 user.Connection = connection;
                 user.MyHub = myHub;
                 userConnectionList.Add(user);
             }
 
-
-            Console.WriteLine("Press Enter to Allocate Groups.");
-            Console.ReadLine();
+            if (!Program.settings.quickTestMode)
+            {
+                Console.WriteLine("Press Enter to Allocate Groups.");
+                Console.ReadLine();
+            }
+            else {
+                Thread.Sleep(1000);
+            }
+            
             //need to simulate uploiad every x secs
-
             userConnectionList.FirstOrDefault().MyHub.Invoke("AssignTestUsersToGroup").ContinueWith(task =>
             {
                 if (task.IsFaulted)
                 {
-                    Console.WriteLine("There was an error calling send: {0}",
-                                      task.Exception.GetBaseException());
+                    Console.WriteLine("There was an error calling send: {0}", task.Exception.GetBaseException());
                 }
                 else
                 {
                     Console.WriteLine("Users assigned to groups!");
-                    //Console.WriteLine(task.Result);
                 }
             }).Wait();
 
-
-
-            Console.WriteLine("Show Allocated groups");
-            Console.ReadLine();
-
-
+            if (!Program.settings.quickTestMode)
+            {
+                Console.WriteLine("Show Allocated groups");
+                Console.ReadLine();
+            }
+            else {
+                Thread.Sleep(1000);
+            }
             List<UserConnection> sortedUserconnections = (from UserConnection userCon in userConnectionList orderby userCon.GroupId select userCon).ToList<UserConnection>();
-
-            //userConnectionList = userConnectionList.OrderBy(element  )
-
             string currentGroup = "";
             foreach (UserConnection connectedUser in userConnectionList) { 
                 if(connectedUser.GroupId != currentGroup ){
@@ -101,10 +136,6 @@ namespace testApplication
                 }
                 Console.WriteLine("     User : {0}", connectedUser.Connection.ConnectionId.ToString());
             }
-
-
-
-
             Console.WriteLine("Run inter-group communication simulation.");
             Console.ReadLine();
             int j = 0;
@@ -117,35 +148,128 @@ namespace testApplication
                 userCon.InitTimer();
                 j++;
             }
-            //EXAMPLE of invoking server method with multiple arguments
-            //userConnectionList.FirstOrDefault().MyHub.Invoke<object[]>("UploadData", "groupId", "playerId", "presses");
 
+            Console.WriteLine("\n\n\nTesting In Progress...\n\n\n");
+
+
+            Console.WriteLine("\n\nPress Enter to End, Disconnect and show stats\n\n");
             Console.ReadLine();
-            Console.WriteLine("Press Enter to Disconnect.");
-            Console.ReadLine();
-            //Garbage collecting - close all connections
-            foreach(UserConnection userI in userConnectionList ){
-                userI.EndConnection();
-                Console.WriteLine("userI._connection.State : " + userI.Connection.State.ToString() );
+
+
+
+
+
+            double countCumalative = 0,
+                        highestCumalative = 0,
+                        lowestCumalative = 0,
+                        sdCumalative = 0,
+                        averageMeanCumalative = 0;
+
+            foreach (UserConnection userCon in userConnectionMonitoringList)
+            {
+                //go through each userConnection monitored and give sumary
+                //average
+                //high 
+                //low
+                //sd
+
+
+                double count = findMathsInfo(userCon.roundtripTimesMsList, "count"),
+                        highest = findMathsInfo(userCon.roundtripTimesMsList, "highest"),
+                        lowest = findMathsInfo(userCon.roundtripTimesMsList, "lowest"),
+                        sd = findMathsInfo(userCon.roundtripTimesMsList, "sd"),
+                        averageMean = findMathsInfo(userCon.roundtripTimesMsList, "averageMean");
+
+                Console.WriteLine("\n Data for user id : {0} ", userCon.Connection.ConnectionId);
+                Console.WriteLine("     count   : {0}", count );
+                Console.WriteLine("     highest : {0}",   highest );
+                Console.WriteLine("     lowest  : {0}", lowest);
+                Console.WriteLine("     sd      : {0}", sd);
+                Console.WriteLine("     average : {0}", averageMean);
+                Console.WriteLine(" ----------------------------------------------------------- ");
+
+                countCumalative += count;
+                highestCumalative += highest;
+                lowestCumalative += lowest;
+                sdCumalative += sd;
+                averageMeanCumalative += averageMean;
+
             }
 
-            //need to clear all the timer events 
-            //Console.WriteLine("--------------- userConnectionList ---------------");
-            //Console.WriteLine(ObjectToXml(userConnectionList)); //TODO: Add this back??
-            Console.ReadLine();
+
+            Console.WriteLine("\n\n *****************    TEST INFO    ***************** ");
+            Console.WriteLine("instances            {0}", Program.settings.connectionsQuantity);
+            Console.WriteLine("monitored instances  {0}", Program.settings.checkClicksTest_instancesToMonitor);
+            Console.WriteLine("timer repeat (MS)    {0}", Program.settings.timerRepeatMs);
+
+            Console.WriteLine("User (spoof) updates click amount every Interval (MS)    {0}", Program.settings.checkClicksTest_valueChangeIntervalMs);
+            Console.WriteLine("User (spoof) updates click variability (%)               {0}", Program.settings.checkClicksTest_valueChangeTimeVariabilityPct);
+            Console.WriteLine(" ----------------------------------------------------------- ");
+
+
+            Console.WriteLine("\n\n ***************** OVERALL AVERAGE ***************** ");
+            Console.WriteLine("     count   : {0}", (countCumalative / userConnectionMonitoringList.Count));
+            Console.WriteLine("     highest : {0}", (highestCumalative / userConnectionMonitoringList.Count));
+            Console.WriteLine("     lowest  : {0}", (lowestCumalative / userConnectionMonitoringList.Count));
+            Console.WriteLine("     sd      : {0}", (sdCumalative / userConnectionMonitoringList.Count));
+            Console.WriteLine("     average : {0}", (averageMeanCumalative / userConnectionMonitoringList.Count));
+            Console.WriteLine(" ----------------------------------------------------------- ");
+
+
+            //show aggregated stats
+            //put this in a seperate text file that will be generated (with date as name) this will then be saved to a specified folder
+
+            //Garbage collecting - close all connections
+            foreach (UserConnection userI in userConnectionList) // disable send/receive data from signalR
+            {
+                userI.BlockData = true;
+            }
+            foreach (UserConnection userI in userConnectionList) //close connections
+            {
+                userI.EndConnection();
+                Console.WriteLine("userI._connection.State : " + userI.Connection.State.ToString());
+            }
 
 
 
+            //if (!Program.settings.quickTestMode) {
+                Console.ReadLine();
+            //}
         }
 
-        public static void UpdatePlayers(string gg) {
 
-          //  (gameGroup) =>
-          //{
-          Console.WriteLine("GameGroup id TEST ----> {0} ", gg);
-          //var a = "adsasdadsad";
-          //});
+        private static double findMathsInfo(HubBlockingCollection<int> list, string infoToFind) {
 
+            if (infoToFind == "count") { return list.Count; }
+            if (list.Count <= 0) { return -1; } //stops list with 0 members being submitted
+
+            double averageMean = 0, 
+                highest = 0, 
+                lowest = list.FirstOrDefault(),
+                standardDeviation = 0;
+
+            int cumulativeTotal = 0;
+            foreach (int item in list) {
+                cumulativeTotal += item;
+                if(item > highest){ highest = item;}
+                if(item < lowest){ lowest = item; }
+            }
+            averageMean = cumulativeTotal / list.Count;
+
+            if(infoToFind == "averageMean") { return averageMean; }
+            else if(infoToFind == "highest"){ return highest; }
+            else if(infoToFind == "lowest"){ return lowest; }
+            else if(infoToFind == "sd"){
+                double cumulativeVariance = 0;
+                foreach (int item in list)
+                {
+                    double variance = Math.Pow((item - averageMean), 2);
+                    cumulativeVariance += variance;
+                }
+                standardDeviation = Math.Pow((cumulativeVariance / list.Count ), 0.5);
+                return standardDeviation;
+            }
+            else{ return -1; }
         }
 
 
@@ -153,7 +277,6 @@ namespace testApplication
         private static string ObjectToXml(object output)
         {
             string objectAsXmlString;
-
             System.Xml.Serialization.XmlSerializer xs = new System.Xml.Serialization.XmlSerializer(output.GetType());
             using (System.IO.StringWriter sw = new System.IO.StringWriter())
             {
@@ -167,16 +290,11 @@ namespace testApplication
                     objectAsXmlString = ex.ToString();
                 }
             }
-
             return objectAsXmlString;
         }
 
 
-
-
     }
-
-
 
 }
 
