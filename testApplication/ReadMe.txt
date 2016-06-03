@@ -27,46 +27,10 @@ Is there a method to log data on AppHarbour?
 
 What is the quickest Route to demonstrating usuage of Running Game?
 
+Testing process:
 
-
-Presentation Possible Questions/Stuff to Present :
-
-- Outline What Game can do, what I have been working on (test harness)
-  - Problems considering Threadsafety (considering the tradeoff with performance, although this was not measured)
-
-
-- Live demo 
-  - Get current App to work on AppHarbour
-  * Check into Git, give it a whirl :)
-  - Work on Mobile
-  *Scale Canvas
-  - Will be smooth (use of velocity)
-  *Implement ability to do this (simple as possible, is it possible to use a library, think about possible future use)
-
-- Demonstrate the application can handle peak load
-  - outline this in presentation (ability to do further )
-  - Basic Game load testing and Peak load precautions
-  * Work out what is the max load that can be handled with test harness and hardcode this into SignalR chat
-  * We can potentially add the PerformanceCounter (see what deal is with Azure scaling) http://stackoverflow.com/questions/278071/how-to-get-the-cpu-usage-in-c and https://msdn.microsoft.com/en-us/library/system.diagnostics.performancecounter(v=vs.110).aspx?cs-save-lang=1&cs-lang=csharp#code-snippet-2
-  - Testing Chat room
-  * Should be a lot easier to do - task for later
-
-- What is required before can be put live?
-  - Need to Develop a way of accessing chat rooms (on different servers) using DB will need to work on this with backend
-  - Further load testing? Would like advice on this
-  - Needs to be code reviewed
-  * refactored, removing a lot of the Dictionaries, or have reference to the GroupList (due to keeping track of signalR Group's th )
-
-  TODO NOW:
-  * Work out what is the max load that can be handled with test harness and hardcode this into SignalR chat
-    1) What is the peak time measured, work out appropriate measure, i.e. will this suffer with connection density increase
-
-*IN PROG* a) Look into more appropriate round trip time and to capture this data (to display in graph)
-        b) Implement above
+*DONE*  a) Look into more appropriate round trip time and to capture this data (to display in graph)
+*DONE*  b) Implement above
         c) Put test harness on another machine to test 
-        d) Get graph that hopefully shows time taken increases with volume of simultaneous games ran
-        e) estimate number from this
-
-    * Can I measure CPU performance ( don't do this for now, best to talk with backend folks about this )
-    2) Bulid in mechanism to limit users joining game
-    3) What is peak loading look like on a feature, see Jacobs Google analytics (maybe he can log me in on his account)
+*DONE*  d) Get graph that hopefully shows time taken increases with volume of simultaneous games ran
+*DONE*  e) estimate number from this

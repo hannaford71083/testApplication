@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNet.SignalR.Client;
 using NLog;
 using System.Diagnostics;
+using System.Configuration;
 
 namespace testApplication
 {
@@ -22,9 +23,13 @@ namespace testApplication
         static void Main(string[] args)
         {
 
+            //get connection Quantity from AppC.Config
+            int connectionQty = 50; //default quantity
+            string appSettingsQty = ConfigurationSettings.AppSettings.Get("connectionQty");
+            int.TryParse(appSettingsQty, out connectionQty);
 
             Program.settings = new TestSettings(
-                connectionsQuantityIn : 300,
+                connectionsQuantityIn: connectionQty,
                 timerRepeatMsIn:        200,
                 randomPercentageIn :    10,
                 quickTestModeIn :       true,
@@ -36,7 +41,6 @@ namespace testApplication
                 checkClicksTest_rangeLowerIn: 0
                 );
 
-
             Program.logger.Debug("Start Program");
             Debug.WriteLine("Start Program");
 
@@ -45,10 +49,11 @@ namespace testApplication
                 Console.ReadLine();
             }
 
+            string hubConnectionUrl = ConfigurationSettings.AppSettings.Get("hubConnectionUrl"); // was set at http://localhost:53398
             int quantity = Program.settings.connectionsQuantity;
             for (int i = 1; i <= quantity; i++ )
             {
-                var connection = new HubConnection("http://localhost:53398"); //Set connection
+                var connection = new HubConnection(hubConnectionUrl); //Set connection
                 var myHub = connection.CreateHubProxy("chatHub");   //Make proxy to hub based on hub name on server
                 connection.Start().Wait(); //Start connection
                 string nameInput = "Dave " + i.ToString();
